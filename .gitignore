@@ -1,0 +1,5 @@
+*.csv
+.next/
+node_modules/
+__pycache__/
+*.json

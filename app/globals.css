@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+
+/* GLOBAL LIGHT BLUE THEME */
+
+:root {
+  --background: #f8fafc;            /* very light blue-white */
+  --sidebar: #e3f2fd;               /* light sky blue */
+  --card: #ffffff;                  /* pure white */
+  --card-border: #d0d7e2;           /* subtle border */
+  --text: #0a0a23;                  /* deep navy */
+  --text-light: #475569;            /* bluish gray */
+  --accent: #2563eb;                /* bright analytics blue */
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text);
+  font-family: Inter, Arial, Helvetica, sans-serif;
+}
+
+/* Make scrollbar clean */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cfd8e3;
+  border-radius: 4px;
+}
