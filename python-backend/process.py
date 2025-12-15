@@ -147,12 +147,7 @@ def fetch_from_typesense():
     print("📡 Connecting to Typesense Cloud...")
     try:
         client = typesense.Client(TYPESENSE_CONFIG)
-        all_jobs = []
-        search_params = {
-            'q': '*',
-            'query_by': 'title, location, description',
-            'per_page': 250,
-        }
+        # Removed unused variables
         
         print("⏳ Streaming ALL Data (Export Mode)...")
         try: jsonl_data = client.collections['jobs'].documents.export()
