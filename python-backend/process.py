@@ -3,6 +3,8 @@ import numpy as np
 import re
 import json
 import os
+from dotenv import load_dotenv
+
 import typesense
 import time
 import io
@@ -22,14 +24,21 @@ app.add_middleware(
 )
 
 cached_df = None
+load_dotenv()
+
+# --- CONFIGURATION ---
+TYPESENSE_CONFIG = {
+    'nodes': [{
+        'host': os.getenv('TYPESENSE_HOST'),
+        'port': os.getenv('TYPESENSE_PORT'),
+        'protocol': os.getenv('TYPESENSE_PROTOCOL')
+    }],
+    'api_key': os.getenv('TYPESENSE_API_KEY'),
+    'connection_timeout_seconds': 300
+}
 
 # --- 1. CONFIGURATION ---
 
-TYPESENSE_CONFIG = {
-    'nodes': [{'host': 'search.jobs.10xscale.ai', 'port': '443', 'protocol': 'https'}],
-    'api_key': 'SVcCXku0gWOx3hVLCrDU9m4gaLPBuvnL',
-    'connection_timeout_seconds': 300 # 5 Minutes
-}
 
 JUNK_SKILLS = [
     "gymnastic", "driving", "cleaning", "music", "unknown", "communication skills", 
@@ -352,8 +361,19 @@ def kpis(countries: Optional[List[str]] = Query(None), role: Optional[str] = Non
 def companies_endpoint(countries: Optional[List[str]] = Query(None), role: Optional[str] = None, exp_min: int = 20, keywords: Optional[str] = None, days_ago: Optional[int] = None):
     d = apply_filters(cached_df, countries, role, exp_min, keywords, days_ago)
     if d.empty or "company_name" not in d.columns: return []
-    c = d["company_name"].astype(str).str.title()
-    c = c[~c.isin(["Nan", "None", "Confidential"])]
+    
+    # 1. Standardize Case
+    c = d["company_name"].astype(str).str.title().str.strip()
+    
+    # 2. THE FILTER: Remove Junk Values
+    junk_companies = [
+        "Nan", "None", "Null", "Unknown", "Confidential", 
+        "Company Name", "Private", "Hidden", "Client Of"
+    ]
+    
+    # Exclude rows where company name is in the junk list OR starts with "Client Of"
+    c = c[~c.isin(junk_companies) & ~c.str.startswith("Client Of")]
+    
     return [{"company": k, "count": int(v)} for k, v in c.value_counts().head(10).items()]
 
 @app.get("/map-points")
