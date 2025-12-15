@@ -13,8 +13,8 @@ export async function GET(
     
     const path = "/" + pathParts.join("/");
 
-    // Keep same backend host/port you use for FastAPI
-    const BACKEND = "http://127.0.0.1:8000";
+    // Use Docker service name when running in container, localhost otherwise
+    const BACKEND = process.env.BACKEND_URL || "http://backend:8000";
 
     // Preserve incoming query string
     const url = new URL(req.url);

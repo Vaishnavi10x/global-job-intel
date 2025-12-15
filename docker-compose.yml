@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./python-backend
+      dockerfile: Dockerfile
+    container_name: global-job-intel-backend
+    ports:
+      - "8011:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./python-backend:/app
+      - /app/.venv
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/filter-options"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: global-job-intel-frontend
+    ports:
+      - "3005:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: global-job-intel-network
