@@ -36,8 +36,18 @@ services:
       - "3005:3000"
     environment:
       - NODE_ENV=development
+    working_dir: /app
     volumes:
-      - .:/app
+      - ./app:/app/app
+      - ./public:/app/public
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./next.config.js:/app/next.config.js
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tailwind.config.js:/app/tailwind.config.js
+      - ./postcss.config.cjs:/app/postcss.config.cjs
+      - ./eslint.config.mjs:/app/eslint.config.mjs
+      - ./next-env.d.ts:/app/next-env.d.ts
       - /app/node_modules
       - /app/.next
     depends_on:
