@@ -5,3 +5,4 @@ numpy
 typesense
 python-multipart
 rapidfuzz
+python-dotenv

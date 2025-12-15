@@ -398,6 +398,8 @@ def skills_endpoint(countries: Optional[List[str]] = Query(None), role: Optional
 @app.get("/salary_by_experience")
 def salary_endpoint(countries: Optional[List[str]] = Query(None), role: Optional[str] = None, exp_min: int = 20, keywords: Optional[str] = None, days_ago: Optional[int] = None):
     d = apply_filters(cached_df, countries, role, exp_min, keywords, days_ago)
+    if "parsed_salary" not in d.columns:
+        return []
     d = d[(d["parsed_salary"] > 0) & (d["min_experience"] < 30)]
     if d.empty: return []
     top_cities = d["city"].value_counts().head(100).index.tolist()

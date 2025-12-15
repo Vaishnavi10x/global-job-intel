@@ -18,6 +18,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks: 
+      - apisix-net
+      - shared_network
+      - db_network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
 
   frontend:
     build:
@@ -35,7 +43,25 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    networks: 
+      - apisix-net
+      - shared_network
+      - db_network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
 
 networks:
-  default:
-    name: global-job-intel-network
+  apisix-net:
+    external: true
+    name: apache_apisix-net
+
+  db_network:
+    external: true
+    name: db_network
+
+  shared_network:
+    external: true
+
+    name: shared_network
