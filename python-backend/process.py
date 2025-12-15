@@ -10,8 +10,7 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from datetime import datetime, timedelta
-# NEW: Import RapidFuzz for Typo Tolerance
-from rapidfuzz import process as fuzzy_process, fuzz
+from rapidfuzz import process, fuzz # Ensure you ran: pip install rapidfuzz
 
 app = FastAPI()
 
@@ -23,20 +22,28 @@ app.add_middleware(
 )
 
 cached_df = None
-ai_role_cache = {}
 
-# --- CONFIG ---
+# --- 1. CONFIGURATION ---
+
 TYPESENSE_CONFIG = {
     'nodes': [{'host': 'search.jobs.10xscale.ai', 'port': '443', 'protocol': 'https'}],
     'api_key': 'SVcCXku0gWOx3hVLCrDU9m4gaLPBuvnL',
-    'connection_timeout_seconds': 300
+    'connection_timeout_seconds': 300 # 5 Minutes
 }
 
 JUNK_SKILLS = [
     "gymnastic", "driving", "cleaning", "music", "unknown", "communication skills", 
     "good communication", "written communication", "verbal communication", 
     "team player", "interpersonal skills", "indian cinema", "sports", "swimming", 
-    "soft skills", "fluent english", "ms office"
+    "soft skills", "fluent english", "ms office", "microsoft office", "communication",
+    "leadership", "management", "problem solving", "analytical skills", "time management",
+    "presentation skills", "negotiation", "teamwork", "adaptability",
+    "maharashtra", "karnataka", "uttar pradesh", "tamil nadu", "telangana", "andhra pradesh",
+    "west bengal", "gujarat", "rajasthan", "kerala", "haryana", "punjab", "madhya pradesh",
+    "delhi", "new delhi", "mumbai", "bangalore", "bengaluru", "hyderabad", "chennai", "pune",
+    "noida", "gurgaon", "gurugram", "kolkata", "ahmedabad", "india", "usa", "united states",
+    "uk", "london", "dubai", "remote", "work from home", "wfh", "hybrid", "onsite", 
+    "full time", "part time", "contract", "permanent", "temporary", "internship", "fresher"
 ]
 
 CITY_COORDS = {
@@ -57,9 +64,62 @@ CITY_COORDS = {
     'singapore': [1.3521, 103.8198], 'dubai': [25.2048, 55.2708],
     'sydney': [-33.8688, 151.2093], 'tokyo': [35.6762, 139.6503],
     'paris': [48.8566, 2.3522], 'toronto': [43.6510, -79.3470],
-    'amsterdam': [52.3676, 4.9041], 'madrid': [40.4168, -3.7038]
+    'amsterdam': [52.3676, 4.9041], 'madrid': [40.4168, -3.7038],
+    'los angeles': [34.0522, -118.2437], 'chicago': [41.8781, -87.6298],
+    'austin': [30.2672, -97.7431], 'seattle': [47.6062, -122.3321]
 }
 
+# --- 4. EXPANDED DICTIONARY (Fixed Missing Categories) ---
+ROLE_MAPPINGS = {
+    # --- 1. LEADERSHIP & STRATEGY ---
+    "Engineering Management": ["engineering manager", "director of engineering", "vp of engineering", "head of engineering", "cto", "tech lead", "team lead", "development manager", "software manager", "application lead", "technical lead"],
+    "Product Leadership": ["chief product officer", "head of product", "vp product", "director of product", "product lead", "group product manager"],
+    "Executive / C-Suite": ["ceo", "cfo", "coo", "chief executive", "president", "founder", "co-founder", "vice president", "director of operations"],
+    
+    # --- 2. CORE TECH ---
+    "Frontend Development": ["frontend", "front-end", "front end", "react", "angular", "vue", "ui developer", "web developer", "javascript developer", "js developer", "next.js"],
+    "Backend Development": ["backend", "back-end", "back end", "node.js", "django", "flask", "laravel", "express", "ruby on rails", "php developer", "golang", "java developer", "spring boot", "java engineer", "python developer"],
+    "Mobile Development": ["ios", "android", "mobile", "flutter", "react native", "swift", "kotlin", "app developer"],
+    "Data Science": ["data scientist", "machine learning", "ai ", "artificial intelligence", "nlp", "computer vision", "deep learning", "predictive modeling", "generative ai", "llm", "applied scientist"],
+    "Data Engineering": ["data engineer", "etl", "spark", "hadoop", "big data", "airflow", "kafka", "warehouse", "database engineer", "data architect", "database administrator", "dba"],
+    "DevOps & Cloud": ["devops", "sre", "site reliability", "cloud engineer", "aws", "azure", "gcp", "docker", "kubernetes", "terraform", "ci/cd", "infrastructure", "platform engineer"],
+    "Cybersecurity": ["cyber", "infosec", "penetration", "vulnerability", "network security", "security analyst", "security engineer", "ciso", "security operations", "information security"],
+    "Software Architecture": ["solutions architect", "technical architect", "enterprise architect", "software architect", "cloud architect", "systems architect"],
+    "QA & Testing": ["qa ", "quality assurance", "test engineer", "automation tester", "selenium", "manual testing", "sdet", "test automation", "software tester"],
+    "UI/UX Design": ["ui/ux", "user interface", "user experience", "product design", "interaction design", "figma", "ux researcher", "senior designer", "ux designer", "ui designer", "visual designer"],
+    "Network Engineering": ["network engineer", "network administrator", "system administrator", "network analyst", "noc technician"],
+
+    # --- 3. GENERAL TECH CATCH-ALL ---
+    "Software Development (General)": ["software engineer", "software development", "developer", "programmer", "sde", "full stack", "application developer", ".net", "c#", "c++", "software design", "engineer", "web engineer", "mulesoft", "salesforce developer"],
+    "Data Analysis": ["data analyst", "business analyst", "analytics", "tableau", "power bi", "sql", "reporting", "bi developer", "operations analyst"],
+    "Technical Support": ["technical support", "help desk", "service desk", "it support", "desktop support", "system support", "application support"],
+
+    # --- 4. BUSINESS FUNCTIONS ---
+    "Product Management": ["product manager", "product owner", "scrum product", "product strategy"],
+    "Project Management": ["project manager", "program manager", "scrum master", "agile", "delivery manager", "pmo", "project coordinator"],
+    "Sales": ["sales", "business development", "bde", "account executive", "inside sales", "closer", "revenue", "account manager", "sales representative", "client executive"],
+    "Marketing": ["marketing", "seo", "content", "social media", "brand", "growth", "campaign", "digital marketing", "market research"],
+    "HR & Recruiting": ["hr ", "human resources", "recruiter", "talent", "people ops", "payroll", "hrbp", "benefits", "staffing"],
+    "Customer Success": ["customer success", "csm", "client success", "client relationship", "onboarding specialist", "account specialist"],
+    "Customer Service": ["customer service", "call center", "support specialist", "client support", "customer care", "representative"],
+    "Finance & Accounting": ["finance", "accountant", "audit", "tax", "banking", "controller", "bookkeeper", "financial analyst", "accounts payable", "treasury"],
+    "Operations": ["operations manager", "admin", "clerk", "logistics", "supply chain", "warehouse", "inventory", "coordinator", "scheduler", "planner"],
+    "Legal & Compliance": ["legal", "lawyer", "attorney", "compliance", "counsel", "paralegal", "contract manager"],
+    
+    # --- 5. CONTENT & CREATIVE ---
+    "Content & Writing": ["content writer", "copywriter", "editor", "content strategist", "technical writer", "documentation", "journalist"],
+    "Creative & Media": ["graphic designer", "art director", "creative director", "animator", "illustrator", "multimedia", "video editor", "photographer", "producer"],
+
+    # --- 6. OTHER INDUSTRIES (To clean the "Other" pile) ---
+    "Education": ["teacher", "professor", "tutor", "academic", "trainer", "instructor", "faculty", "education"],
+    "Healthcare": ["nurse", "medical", "doctor", "pharmacy", "clinical", "physician", "therapist", "psychologist", "healthcare", "caregiver"],
+    "Construction & Civil": ["site engineer", "civil engineer", "surveyor", "structural engineer", "construction manager", "site supervisor"],
+    "Mechanical & Electrical": ["mechanical engineer", "electrical engineer", "technician", "electrician", "mechanic", "maintenance", "service engineer"],
+    "Retail & Hospitality": ["store manager", "retail", "chef", "cook", "restaurant", "hotel", "housekeeping", "front desk", "receptionist", "barista"],
+}
+
+
+# --- HELPERS ---
 def clean_salary_aggressive(x):
     if not isinstance(x, str): return 0
     x = x.lower().replace(',', '').replace('₹', '').replace('$', '').strip()
@@ -87,20 +147,23 @@ def fetch_from_typesense():
     print("📡 Connecting to Typesense Cloud...")
     try:
         client = typesense.Client(TYPESENSE_CONFIG)
+        all_jobs = []
+        search_params = {
+            'q': '*',
+            'query_by': 'title, location, description',
+            'per_page': 250,
+        }
         
         print("⏳ Streaming ALL Data (Export Mode)...")
-        try:
-            jsonl_data = client.collections['jobs'].documents.export()
-        except:
-            jsonl_data = client.collections['job_postings'].documents.export()
+        try: jsonl_data = client.collections['jobs'].documents.export()
+        except: jsonl_data = client.collections['job_postings'].documents.export()
         
         if not jsonl_data:
             print("❌ Export returned empty data.")
             return None
 
-        print("⚡ Parsing data...")
+        print("⚡ Parsing data into DataFrame...")
         df = pd.read_json(io.StringIO(jsonl_data), lines=True)
-        
         df.to_csv("live_cache.csv", index=False)
         print(f"✅ Fetched Total {len(df)} Live Jobs.")
         return df
@@ -110,13 +173,7 @@ def fetch_from_typesense():
         return None
 
 def load_data_internal():
-    global cached_df, ai_role_cache
-    
-    if os.path.exists("gemini_role_map.json"):
-        with open("gemini_role_map.json", "r") as f:
-            ai_role_cache = json.load(f)
-    else:
-        ai_role_cache = {}
+    global cached_df
 
     df = fetch_from_typesense()
     if df is None or df.empty:
@@ -126,9 +183,9 @@ def load_data_internal():
     df.columns = df.columns.str.strip().str.lower()
     
     rename_map = {
-        "title": "raw_role", "job title": "raw_role", 
+        "title": "raw_role", "job title": "raw_role", "job_title": "raw_role",
         "location": "raw_location", "ctc": "ctc", "salary": "ctc",
-        "min_experience": "min_experience", "skills": "skills", 
+        "min_experience": "min_experience", "skills": "skills", "key_skills": "skills",
         "posted_at": "posted_at", "job_type": "job_type", "location_type": "location_type",
         "apply_link": "apply_url", "url": "apply_url",
         "company_name": "company_name", "description": "description",
@@ -136,82 +193,40 @@ def load_data_internal():
     }
     df.rename(columns=rename_map, inplace=True)
 
-    # --- COORDINATE PARSING ---
-    def parse_latlon_hybrid(row):
-        val = row.get("latlon")
-        lat, lon = None, None
-        try:
-            if isinstance(val, list) and len(val) == 2:
-                lat, lon = float(val[0]), float(val[1])
-            elif isinstance(val, str):
-                clean = val.replace('[', '').replace(']', '').strip()
-                if clean:
-                    parts = clean.split(',')
-                    if len(parts) == 2: lat, lon = float(parts[0]), float(parts[1])
-        except: pass
+    # --- FUZZY CLASSIFIER (OPTIMIZED) ---
+    print("🧠 Classifying Roles (Fuzzy Logic)...")
+    unique_titles = df['raw_role'].unique()
+    title_map = {}
 
-        if (lat is None or pd.isna(lat)) and isinstance(row.get("city"), str):
-            city_key = row["city"].lower()
-            if city_key in CITY_COORDS:
-                lat, lon = CITY_COORDS[city_key]
+    for title in unique_titles:
+        if not isinstance(title, str): 
+            title_map[title] = "Other"
+            continue
+            
+        t_lower = title.lower()
+        matched_group = "Other"
         
-        return lat, lon
-
-    # --- ROLE STANDARDIZATION (AI + DICTIONARY + FUZZY) ---
-    # Define Dictionary Outside to avoid re-creating it
-    MANUAL_MAPPINGS = {
-        "Software Development": ["software engineer", "developer", "programmer", "sde", "full stack", "backend", "frontend", ".net", "java", "coding", "web developer"],
-        "Data Science": ["data scientist", "data analyst", "machine learning", "ai ", "artificial intelligence", "nlp", "computer vision"],
-        "DevOps & Cloud": ["devops", "sre", "cloud", "aws", "azure", "docker", "kubernetes", "linux"],
-        "Product Management": ["product manager", "product owner", "scrum product"],
-        "Design": ["ui", "ux", "designer", "graphic", "creative", "artist"],
-        "Sales": ["sales", "business development", "bde", "account manager", "inside sales"],
-        "Marketing": ["marketing", "seo", "content", "social media", "brand", "digital marketing"],
-        "HR": ["hr ", "human resources", "recruiter", "talent", "payroll"],
-        "Customer Support": ["customer support", "customer service", "help desk", "support specialist"],
-        "Finance": ["accountant", "finance", "audit", "tax", "banking"],
-    }
-
-    def standardize_role(title):
-        if not isinstance(title, str): return "Other"
-        t_clean = title.strip()
-        t_lower = t_clean.lower()
+        # 1. Exact Substring Match (Fast)
+        for group, keywords in ROLE_MAPPINGS.items():
+            if any(k in t_lower for k in keywords):
+                matched_group = group
+                break
         
-        # 1. Check AI JSON (Fastest)
-        if t_clean in ai_role_cache:
-            mapped = ai_role_cache[t_clean]
-            if mapped != "Other": return mapped
+        # 2. Fuzzy Match (If Exact Failed)
+        if matched_group == "Other":
+            # Check against all keywords using partial match
+            best_score = 0
+            for group, keywords in ROLE_MAPPINGS.items():
+                match = process.extractOne(t_lower, keywords, scorer=fuzz.partial_ratio)
+                if match and match[1] > 85: # Strict Threshold
+                    if match[1] > best_score:
+                        best_score = match[1]
+                        matched_group = group
 
-        # 2. Check Manual Dictionary (Exact Substring)
-        for group, keywords in MANUAL_MAPPINGS.items():
-            for k in keywords:
-                if k in t_lower: return group
+        title_map[title] = matched_group
 
-        # 3. Fuzzy Matching (Slower but catches "Softwear Enginer")
-        # We check the title against all keywords in our dictionary
-        best_score = 0
-        best_group = None
-        
-        # Iterate groups
-        for group, keywords in MANUAL_MAPPINGS.items():
-            # Extract best match for this title against the list of keywords for this group
-            match = fuzzy_process.extractOne(t_lower, keywords, scorer=fuzz.token_set_ratio)
-            if match:
-                score = match[1]
-                if score > 85: # Strict threshold
-                    if score > best_score:
-                        best_score = score
-                        best_group = group
-        
-        if best_group: return best_group
-
-        return "Other"
-
-    print("🧠 Standardizing Roles (This may take a moment)...")
-    if "raw_role" in df.columns:
-        df["job_role"] = df["raw_role"].apply(standardize_role)
-    else:
-        df["job_role"] = "Unknown"
+    df["job_role"] = df["raw_role"].map(title_map)
+    print("✅ Classification Complete.")
 
     # Location Parsing
     if "raw_location" in df.columns:
@@ -236,7 +251,27 @@ def load_data_internal():
     else:
         df["city"], df["country"] = "Unknown", "Global"
 
-    # Apply Lat/Lon
+    # LatLon
+    def parse_latlon_hybrid(row):
+        val = row.get("latlon")
+        lat, lon = None, None
+        try:
+            if isinstance(val, list) and len(val) == 2:
+                lat, lon = float(val[0]), float(val[1])
+            elif isinstance(val, str):
+                clean = val.replace('[', '').replace(']', '').strip()
+                if clean:
+                    parts = clean.split(',')
+                    if len(parts) == 2:
+                        lat, lon = float(parts[0]), float(parts[1])
+        except: pass
+
+        if (lat is None or pd.isna(lat)) and isinstance(row.get("city"), str):
+            city_key = row["city"].lower()
+            if city_key in CITY_COORDS:
+                lat, lon = CITY_COORDS[city_key]
+        return lat, lon
+
     df[['lat', 'lon']] = df.apply(lambda x: pd.Series(parse_latlon_hybrid(x)), axis=1)
 
     # Metrics
@@ -255,7 +290,7 @@ def load_data_internal():
     # Skills Cleaning
     if "skills" in df.columns:
         def clean_skills(x):
-            if isinstance(x, list): raw_list = [str(s).lower().strip() for s in x]
+            if isinstance(x, list): raw_list = [str(s).lower() for s in x]
             else: raw_list = [s.strip().lower() for s in str(x).replace("'", "").replace("[", "").replace("]", "").split(",") if s.strip()]
             
             final_list = []
@@ -279,10 +314,13 @@ def get_filter_options():
     countries = sorted([str(x) for x in cached_df["country"].unique() if x and len(str(x)) > 1])
     roles = []
     if "job_role" in cached_df.columns:
-        # Sort and exclude junk
-        roles = sorted([str(r) for r in cached_df["job_role"].unique() if r and str(r) not in ['nan', 'Unknown', 'Other']])
+        roles = sorted([str(r) for r in cached_df["job_role"].unique() if r and str(r) not in ['nan', 'Unknown']])
+        if "Other" in roles:
+            roles.remove("Other")
+            roles.append("Other")
     return {"countries": countries, "roles": roles}
 
+# ... (Endpoints apply_filters, kpis, companies, map-points, skills, salary, raw-jobs remain unchanged) ...
 def apply_filters(df, countries, role, exp_max, keywords, days_ago):
     if df is None: return pd.DataFrame()
     d = df.copy()
@@ -306,21 +344,14 @@ def apply_filters(df, countries, role, exp_max, keywords, days_ago):
 def kpis(countries: Optional[List[str]] = Query(None), role: Optional[str] = None, exp_min: int = 20, keywords: Optional[str] = None, days_ago: Optional[int] = None):
     d = apply_filters(cached_df, countries, role, exp_min, keywords, days_ago)
     if d.empty: return {"total_jobs": 0, "avg_ctc": 0, "avg_experience": 0, "top_skill": "N/A"}
-    
-    remote = 0
-    onsite = 0
-    if "location_type" in d.columns:
-        remote = len(d[d["location_type"].astype(str).str.lower().str.contains("remote", na=False)])
-        onsite = len(d) - remote
-
-    return {
-        "total_jobs": len(d), 
-        "avg_ctc": d[d["parsed_salary"]>0]["parsed_salary"].mean() or 0, 
-        "avg_experience": d["min_experience"].mean(), 
-        "top_skill": "N/A",
-        "remote_count": remote,
-        "onsite_count": onsite
-    }
+    valid_sal = d[d["parsed_salary"] > 0]
+    avg_ctc = valid_sal["parsed_salary"].mean() if not valid_sal.empty else 0
+    top_skill = "N/A"
+    if "skills" in d.columns:
+        s = d["skills"].explode().dropna()
+        if not s.empty: top_skill = s.value_counts().idxmax()
+    remote = len(d[d["location_type"].astype(str).str.lower().str.contains("remote", na=False)]) if "location_type" in d.columns else 0
+    return {"total_jobs": len(d), "avg_ctc": avg_ctc, "avg_experience": d["min_experience"].mean(), "top_skill": top_skill, "remote_count": remote, "onsite_count": len(d)-remote}
 
 @app.get("/companies")
 def companies_endpoint(countries: Optional[List[str]] = Query(None), role: Optional[str] = None, exp_min: int = 20, keywords: Optional[str] = None, days_ago: Optional[int] = None):
@@ -334,19 +365,9 @@ def companies_endpoint(countries: Optional[List[str]] = Query(None), role: Optio
 def map_points(countries: Optional[List[str]] = Query(None), role: Optional[str] = None, exp_min: int = 20, keywords: Optional[str] = None, days_ago: Optional[int] = None):
     d = apply_filters(cached_df, countries, role, exp_min, keywords, days_ago)
     if d.empty: return []
-    
-    # 1. Drop rows without coordinates
     d_coords = d.dropna(subset=['lat', 'lon'])
-    
     if d_coords.empty: return []
-
-    # 2. Group by City
-    city_counts = d_coords.groupby("city").agg(
-        count=("city", "count"),
-        lat=("lat", "mean"),
-        lon=("lon", "mean")
-    ).reset_index()
-
+    city_counts = d_coords.groupby("city").agg(count=("city", "count"), lat=("lat", "mean"), lon=("lon", "mean")).reset_index()
     return city_counts.to_dict(orient="records")
 
 @app.get("/skills")
