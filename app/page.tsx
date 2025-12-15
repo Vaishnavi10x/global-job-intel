@@ -178,6 +178,22 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <KPIBar kpis={kpis} loading={loading} />
 
+        {/* --- MOVED BANNER HERE (Under KPIs, Above Maps) --- */}
+        <div className="flex flex-col md:flex-row items-center justify-between bg-blue-600 rounded-xl p-5 shadow-md text-white">
+           <div>
+             <h3 className="text-lg font-bold">Looking for specific roles?</h3>
+             <p className="text-blue-100 text-sm">Explore thousands of live listings on our main platform.</p>
+           </div>
+           <a 
+             href="https://careerpilot.10xscale.ai/login" 
+             target="_blank" 
+             rel="noopener noreferrer"
+             className="mt-3 md:mt-0 bg-white text-blue-700 hover:bg-blue-50 font-bold py-2 px-6 rounded-full shadow transition transform hover:scale-105 flex items-center gap-2"
+           >
+             View All Job Openings ↗
+           </a>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[500px]">
           {/* MAP */}
           <div className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-4 flex flex-col shadow-sm">
@@ -231,22 +247,6 @@ export default function DashboardPage() {
                   {loading ? <div className="text-center mt-10 text-slate-400">Loading...</div> : <TopCompanies companies={companies} />}
                </div>
            </div>
-        </div>
-
-        {/* --- NEW: VIEW ALL JOBS BANNER (Replaced Table) --- */}
-        <div className="mt-8 mb-12 flex flex-col items-center justify-center bg-blue-50 border border-blue-100 rounded-2xl p-8 shadow-sm">
-           <h3 className="text-2xl font-bold text-slate-900 mb-2">Looking for more details?</h3>
-           <p className="text-slate-500 mb-6 text-center max-w-lg">
-             Explore thousands of live job listings, filter by specific criteria, and apply directly on our main platform.
-           </p>
-           <a 
-             href="https://careerpilot.10xscale.ai/login" 
-             target="_blank" 
-             rel="noopener noreferrer"
-             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105 flex items-center gap-2"
-           >
-             View All Job Openings ↗
-           </a>
         </div>
 
       </div>
