@@ -146,8 +146,9 @@ def clean_experience_aggressive(x):
     if not nums: return 0
     return float(nums[0])
 
-# --- TYPESENSE FETCHER ---
+# --- TYPESENSE FETCHER (SEARCH LOOP - COMPATIBLE WITH YOUR KEY) ---
 def fetch_from_typesense():
+    # 1. Cache Check
     if os.path.exists("live_cache.csv"):
         if (time.time() - os.path.getmtime("live_cache.csv")) < 86400:
             print("⚡ Loading from Local Cache...")
@@ -156,21 +157,45 @@ def fetch_from_typesense():
     print("📡 Connecting to Typesense Cloud...")
     try:
         client = typesense.Client(TYPESENSE_CONFIG)
-        # Removed unused variables
+        all_jobs = []
+        search_params = {
+            'q': '*',
+            'query_by': 'title, location',
+            'per_page': 250, # Max allowed per page
+        }
         
-        print("⏳ Streaming ALL Data (Export Mode)...")
-        try: jsonl_data = client.collections['jobs'].documents.export()
-        except: jsonl_data = client.collections['job_postings'].documents.export()
+        print("⏳ Fetching Live Jobs via Search API...")
         
-        if not jsonl_data:
-            print("❌ Export returned empty data.")
+        page = 1
+        # Loop to get all data
+        while True:
+            search_params['page'] = page
+            try:
+                results = client.collections['jobs'].documents.search(search_params)
+            except:
+                results = client.collections['job_postings'].documents.search(search_params)
+            
+            if 'hits' in results and len(results['hits']) > 0:
+                for hit in results['hits']:
+                    all_jobs.append(hit['document'])
+                
+                # Progress Log
+                if len(all_jobs) % 2500 == 0:
+                    print(f"   ...fetched {len(all_jobs)} jobs...")
+                
+                page += 1
+            else:
+                print("✅ Finished fetching.")
+                break
+        
+        df = pd.DataFrame(all_jobs)
+        if not df.empty:
+            df.to_csv("live_cache.csv", index=False)
+            print(f"✅ Total Jobs Loaded: {len(df)}")
+            return df
+        else:
+            print("❌ No jobs found.")
             return None
-
-        print("⚡ Parsing data into DataFrame...")
-        df = pd.read_json(io.StringIO(jsonl_data), lines=True)
-        df.to_csv("live_cache.csv", index=False)
-        print(f"✅ Fetched Total {len(df)} Live Jobs.")
-        return df
 
     except Exception as e:
         print(f"❌ Typesense Error: {e}")
