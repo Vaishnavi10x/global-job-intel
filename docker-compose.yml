@@ -1,0 +1,77 @@
+services:
+  backend:
+    build:
+      context: ./python-backend
+      dockerfile: Dockerfile
+    container_name: global-job-intel-backend
+    ports:
+      - "8011:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./python-backend:/app
+      - /app/.venv
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/filter-options"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks: 
+      - apisix-net
+      - shared_network
+      - db_network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: global-job-intel-frontend
+    ports:
+      - "3005:3000"
+    environment:
+      - NODE_ENV=development
+    working_dir: /app
+    volumes:
+      - ./app:/app/app
+      - ./public:/app/public
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./next.config.js:/app/next.config.js
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tailwind.config.js:/app/tailwind.config.js
+      - ./postcss.config.cjs:/app/postcss.config.cjs
+      - ./eslint.config.mjs:/app/eslint.config.mjs
+      - ./next-env.d.ts:/app/next-env.d.ts
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks: 
+      - apisix-net
+      - shared_network
+      - db_network
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+
+networks:
+  apisix-net:
+    external: true
+    name: apache_apisix-net
+
+  db_network:
+    external: true
+    name: db_network
+
+  shared_network:
+    external: true
+
+    name: shared_network
